@@ -1,0 +1,111 @@
+name: My own pipeline for testing of Bandit and Gitleaks
+
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        exclude:
+          - python-version: '3.9'
+        include:
+          - python-version: '3.13'
+    steps:
+      - name: Step 1 - Download the code 
+        uses: actions/checkout@v4
+
+      - name: Step 2 - Install python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          
+      - name: Step 3 - Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Step 4 - Run test
+        run: pytest
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Step 1 - Checkout code
+        uses: actions/checkout@v4
+
+      - name: Step 2 - Install python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Step 3 - Install & Run Bandit
+        run: |
+          pip install bandit
+          bandit -r . --exit-zero
+
+      - name: Step 4 - Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Step 1 - Download the code
+        uses: actions/checkout@v4
+
+      - name: Step 2 - Install python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Step 3 - Bundle the code
+        run: zip -r test-pipeline.zip app.py requirements.txt
+
+      - name: Step 4 - Upload the artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-artifact
+          path: test-pipeline.zip
+      
+  #deploy:   Commented out the whole deploy job becasue I don't wanna spin an EC2 server now.
+    #runs-on: ubuntu-latest
+    #needs: build
+    #steps:
+      #- name: Step 1 - Download the artifact
+        #uses: actions/download-artifact@v4
+        #with:
+          #name: code-artifact
+
+      #- name: Step 2 - Copy the code on server
+        #uses: appleboy/scp-action@v1
+        #with:
+          #host: ${{ secrets.EC2_HOST }}
+          #username: ubuntu
+          #key: ${{ secrets.EC2_SSH_KEY }}
+          #source: test-pipeline.zip
+          #target: /home/ubuntu
+
+      #- name: Step 3 - Deploy code on server
+        #uses: appleboy/ssh-action@v1
+        #with:
+          #host: ${{ secrets.EC2_HOST }}
+          #username: ubuntu
+          #key: ${{ secrets.EC2_SSH_KEY }}
+          #script: |
+            #sudo apt update 
+            #sudo apt install unzip python3-pip -y
+            #cd /home/ubuntu
+            #sudo unzip -o test-pipeline.zip
+            #pip install -r requirements.txt
+            #echo "Deployment completed sucessfully"
