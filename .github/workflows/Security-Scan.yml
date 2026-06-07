@@ -1,9 +1,9 @@
 name: My own pipeline for testing of Bandit and Gitleaks
 
 on: 
-  push:
-    branches:
-      - main
+  #push:
+    #branches:
+      #- main
   pull_request:
     branches:
       - main
