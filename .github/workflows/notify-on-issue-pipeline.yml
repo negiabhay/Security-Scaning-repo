@@ -1,11 +1,12 @@
 name: Notify by issue creation on failure of pipeline
 
 on: 
-  push:
-    branches:
-      - main
   workflow_dispatch: 
+  
+permissions: 
+  issues: write
 
+  
 jobs:
   test:
     runs-on: ubuntu-latest
